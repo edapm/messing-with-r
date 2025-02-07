@@ -1,0 +1,11 @@
+---
+title: "RMarkdown Home"
+author: "Ed Mason"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Setup code
+```
+
+Last updated: `r Sys.Date()`
