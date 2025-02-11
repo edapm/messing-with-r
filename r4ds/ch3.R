@@ -16,3 +16,239 @@ install_if_missing <- function(pkg) {
 for (pkg in packages) {
   install_if_missing(pkg)
 }
+
+# 3.1 Introduction
+# open dataset (RStudio)
+View(flights)
+
+# open dataset (Terminal)
+# glimpse(flights)
+
+# Run dplyr verbs on flights
+flights |>
+  filter(dest == "IAH") |> 
+  group_by(year, month, day) |> 
+  summarize(
+    arr_delay = mean(arr_delay, na.rm = TRUE)
+  )
+
+# 3.2 Rows
+# filter() examples
+# filter for flights where dep_delay is greater than 120
+flights |> 
+  filter(dep_delay > 120)
+
+# filter for flights that departed on Jan 1
+flights |> 
+  filter(month == 1 & day == 1)
+
+# filter for flights that departed in Jan or Feb
+flights |> 
+  filter(month == 1 | month == 2)
+
+# filter for flights that departed in Jan or Feb (better way to do it)
+flights |> 
+  filter(month %in% c(1, 2))
+
+# arrange() examples
+# arrange by year, month, day, and dep_time
+flights |> 
+  arrange(year, month, day, dep_time)
+
+# arrange by dep_time, descending
+flights |> 
+  arrange(desc(dep_delay))
+
+# distinct() examples
+# remove any duplicate rows
+flights |> 
+  distinct()
+
+# find all unique origin/dest pairs
+flights |> 
+  distinct(origin, dest)
+
+# find all unique origin/dest pairs BUT keep all other columns too
+flights |> 
+  distinct(origin, dest, .keep_all = TRUE)
+
+# 3.3 Columns
+# mutate() examples
+# add two new variables, gain and speed (.before=1 puts them at the start)
+flights |> 
+  mutate(
+    gain = dep_delay - arr_delay,
+    speed = distance / air_time * 60,
+    .before = 1
+  )
+
+# .[item] means argument as opposed to another variable
+# eg. .after = day would place the variables after "day" column
+
+# .keep = used allows us to only show columns involved in the mutate()
+flights |> 
+  mutate(
+    gain = dep_delay - arr_delay,
+    hours = air_time / 60,
+    gain_per_hour = gain / hours,
+    .keep = "used"
+  )
+
+# select() examples
+# select columns by name
+flights |> 
+  select(year, month, day)
+
+# select columns between year and day
+flights |> 
+  select(year:day)
+
+# select columns except those between year and day
+flights |> 
+  select(!year:day)
+
+# select columns that are characters
+flights |> 
+  select(where(is.character))
+
+# rename as select()
+flights |> 
+  select(tail_num = tailnum)
+
+# rename() examples
+flights |> 
+  rename(tail_num = tailnum)
+
+# relocate() examples
+# move columns to the front
+flights |> 
+  relocate(time_hour, air_time)
+
+# you can specify arguments, like with mutate(), to move them other places
+flights |> 
+  relocate(year:dep_time, .after = time_hour)
+flights |> 
+  relocate(starts_with("arr"), .before = dep_time)
+
+# 3.4 The Pipe
+# Pipe is useful in combining verbs (e.g. fastest flights to Houston)
+flights |> 
+  filter(dest == "IAH") |> 
+  mutate(speed = distance / air_time * 60) |> 
+  select(year:day, dep_time, carrier, flight, speed) |> 
+  arrange(desc(speed))
+
+# Without the Pipe
+arrange(
+  select(
+    mutate(
+      filter(
+        flights, 
+        dest == "IAH"
+      ),
+      speed = distance / air_time * 60
+    ),
+    year:day, dep_time, carrier, flight, speed
+  ),
+  desc(speed)
+)
+
+# 3.5 Groups
+# group_by() examples
+# group by month
+flights |> 
+  group_by(month)
+# doesnt change output but creates these groups which is helpful when using other verbs
+
+# summarise() or summarize() examples
+flights |> 
+  group_by(month) |> 
+  summarise(
+    avg_delay = mean(dep_delay)
+  )
+# returns error -> NA (because of missing values in dep_delay column)
+flights |> 
+  group_by(month) |> 
+  summarise(
+    avg_delay = mean(dep_delay, na.rm = TRUE)
+  )
+
+# shows number of rows in each group
+flights |> 
+  group_by(month) |> 
+  summarise(
+    avg_delay = mean(dep_delay, na.rm = TRUE), 
+    n = n()
+  )
+
+# slice_() examples
+# slice_head() takes the first row of each group
+# slice_tail() takes the last row of each group
+# slice_min() takes the row with the minimum value of a variable
+# slice_max() takes the row with the maximum value of a variable
+# slice_sample() takes a row from each group
+# n = 1 means take one row from each group, n = x means take x rows from each group, etc.
+
+# Eg. Find the flights that are the most delayed at each dest
+flights |> 
+  group_by(dest) |> 
+  slice_max(arr_delay, n = 1) |>
+  relocate(dest)
+# more rows than groups because of ties (with_ties = FALSE to disable this)
+
+# Group by multiple variables
+daily <- flights |>  
+  group_by(year, month, day)
+daily
+
+daily_flights <- daily |> 
+  summarise(n = n())
+
+daily_flights <- daily |> 
+  summarise(
+    n = n(), 
+    .groups = "drop_last"
+  )
+
+# You can also ungroup
+daily |> 
+  ungroup()
+
+daily |> 
+  ungroup() |>
+  summarise(
+    avg_delay = mean(dep_delay, na.rm = TRUE), 
+    flights = n()
+  )
+
+# by() examples
+# by() is a more flexible version of group_by() that allows you to group by functions of the data
+flights |> 
+  summarise(
+    delay = mean(dep_delay, na.rm = TRUE), 
+    n = n(),
+    .by = month
+  )
+
+# multiple variables
+flights |> 
+  summarise(
+    delay = mean(dep_delay, na.rm = TRUE), 
+    n = n(),
+    .by = c(origin, dest)
+  )
+
+# 3.6 Case Study
+# Find the best batters by looking at the ratio of hits to at-bats
+batters <- Lahman::Batting |> 
+  group_by(playerID) |> 
+  summarize(
+    performance = sum(H, na.rm = TRUE) / sum(AB, na.rm = TRUE),
+    n = sum(AB, na.rm = TRUE)
+  )
+
+batters |> 
+  filter(n > 100) |> 
+  ggplot(aes(x = n, y = performance)) +
+  geom_point(alpha = 1 / 10) + 
+  geom_smooth(se = FALSE)
